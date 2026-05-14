@@ -423,7 +423,7 @@ export const OutlineEditor: React.FC = () => {
         }
       } catch (error: any) {
         console.error('自动生成大纲失败:', error);
-        const message = error.friendlyMessage || error.message || t('outline.messages.generateFailed');
+        const message = error.message || t('outline.messages.generateFailed');
         show({ message, type: 'error' });
       }
     })();

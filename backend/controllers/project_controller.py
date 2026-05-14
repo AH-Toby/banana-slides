@@ -149,7 +149,7 @@ def _smart_merge_pages(project_id, pages_data):
         if description_text:
             page.set_description_content({
                 'text': description_text,
-                'generated_at': datetime.now(timezone.utc).isoformat(),
+                'generated_at': datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             })
             page.status = 'DESCRIPTION_GENERATED'
         elif not page.description_content:
