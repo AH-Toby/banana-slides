@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Key, Image, Zap, Save, RotateCcw, Globe, FileText, Brain, ArrowUp, HelpCircle, Link2, ChevronDown, Volume2 } from 'lucide-react';
+import { Home, Key, Image, Zap, Save, RotateCcw, Globe, FileText, Brain, ArrowUp, HelpCircle, Link2, ChevronDown, Volume2, Info } from 'lucide-react';
 import { useT } from '@/hooks/useT';
+import { appVersion } from '@/utils/appVersion';
 
 // 组件内翻译
 const settingsI18n = {
@@ -19,8 +20,10 @@ const settingsI18n = {
         baiduOcr: "百度配置", serviceTest: "服务测试", lazyllmConfig: "LazyLLM 厂商配置",
         vendorApiKeys: "厂商 API Key 配置",
         advancedSettings: "高级设置",
-        elevenlabs: "ElevenLabs 语音合成"
+        elevenlabs: "ElevenLabs 语音合成",
+        about: "关于"
       },
+      about: { version: "当前版本", source: "GitHub 项目" },
       openaiOAuth: {
         title: "OpenAI 账号连接",
         description: "通过 OAuth 登录 OpenAI 账号，无需手动输入 API Key 即可使用 OpenAI 的模型（如 GPT Image）",
@@ -154,8 +157,10 @@ const settingsI18n = {
         baiduOcr: "Baidu Configuration", serviceTest: "Service Test", lazyllmConfig: "LazyLLM Provider Configuration",
         vendorApiKeys: "Vendor API Key Configuration",
         advancedSettings: "Advanced Settings",
-        elevenlabs: "ElevenLabs Text-to-Speech"
+        elevenlabs: "ElevenLabs Text-to-Speech",
+        about: "About"
       },
+      about: { version: "Current Version", source: "GitHub Project" },
       openaiOAuth: {
         title: "OpenAI Account",
         description: "Log in with your OpenAI account via OAuth to use OpenAI models (e.g. GPT Image) without entering an API key",
@@ -418,6 +423,30 @@ const GlobalVendorKeyInput: React.FC<{
     </div>
   );
 };
+
+type SettingsTranslator = ReturnType<typeof useT>;
+
+export const SettingsAbout: React.FC<{ t: SettingsTranslator }> = ({ t }) => (
+  <div className="pt-4 border-t border-gray-200 dark:border-border-primary">
+    <h2 className="text-xl font-semibold text-gray-900 dark:text-foreground-primary mb-3 flex items-center">
+      <Info size={20} />
+      <span className="ml-2">{t('settings.sections.about')}</span>
+    </h2>
+    <div className="flex flex-col gap-2 text-sm text-gray-600 dark:text-foreground-tertiary sm:flex-row sm:items-center sm:justify-between">
+      <span title={appVersion.detail} aria-label={`${t('settings.about.version')} ${appVersion.detail}`}>
+        {t('settings.about.version')}: {appVersion.display}
+      </span>
+      <a
+        href="https://github.com/Anionex/banana-slides"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-banana-700 dark:text-banana hover:underline"
+      >
+        {t('settings.about.source')}
+      </a>
+    </div>
+  </div>
+);
 
 const formDataFromSettings = (data: SettingsType): typeof initialFormData => ({
   ai_provider_format: resolveLazyllmVendor(data.ai_provider_format || 'gemini', data.lazyllm_api_keys_info),
@@ -1623,6 +1652,8 @@ export const Settings: React.FC = () => {
             {isSaving ? t('settings.actions.saving') : t('settings.actions.save')}
           </Button>
         </div>
+
+        <SettingsAbout t={t} />
       </div>
     </>
   );

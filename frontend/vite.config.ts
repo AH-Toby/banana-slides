@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -19,6 +20,18 @@ function computeWorktreePort(basePort: number): number {
   return basePort + offset
 }
 
+function gitValue(command: string): string {
+  try {
+    return execSync(command, {
+      cwd: path.resolve(__dirname, '..'),
+      stdio: ['ignore', 'pipe', 'ignore'],
+      encoding: 'utf8',
+    }).trim()
+  } catch {
+    return ''
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // 从项目根目录读取 .env 文件（相对于 frontend 目录的上一级）
@@ -31,10 +44,17 @@ export default defineConfig(({ mode }) => {
   const backendPort = env.BACKEND_PORT || String(computeWorktreePort(5000))
   const frontendPort = Number(env.FRONTEND_PORT) || computeWorktreePort(3000)
   const backendUrl = `http://localhost:${backendPort}`
+  const gitTag = gitValue('git describe --tags --exact-match HEAD')
+  const gitSha = gitValue('git rev-parse HEAD')
   
   return {
     envDir,
     plugins: [react()],
+    define: {
+      'import.meta.env.VITE_APP_VERSION_TAG': JSON.stringify(gitTag),
+      'import.meta.env.VITE_APP_COMMIT_SHA': JSON.stringify(gitSha),
+      'import.meta.env.VITE_APP_COMMIT_SHORT_SHA': JSON.stringify(gitSha.slice(0, 7)),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
