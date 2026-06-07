@@ -238,7 +238,10 @@ class Settings(db.Model):
             status_code = getattr(getattr(exc, 'response', None), 'status_code', None)
             if status_code in (400, 401):
                 self.clear_openai_oauth()
-                db.session.commit()
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
             return None
         except Exception:
             return None

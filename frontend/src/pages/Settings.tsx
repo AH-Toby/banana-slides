@@ -1076,7 +1076,7 @@ export const Settings: React.FC = () => {
       pollInterval = setInterval(async () => {
         try {
           const statusResponse = await api.getTestStatus(taskId);
-          const statusData = statusResponse.data;
+          const statusData = statusResponse?.data;
           if (!statusData) {
             throw new Error(t('settings.serviceTest.testFailed'));
           }
