@@ -515,6 +515,10 @@ Python 3.10+ + Flask 3.0 + uv + SQLite
 ## **🔧 常见问题**
 可见[官网文档](https://docs.bananaslides.online/zh/faq)
 
+也可以直接到 DeepWiki 提问 
+<a href="https://deepwiki.com/Anionex/banana-slides"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+
+
 
 ## 🤝 贡献指南
 
