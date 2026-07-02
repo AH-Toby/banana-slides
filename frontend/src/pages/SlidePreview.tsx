@@ -2498,7 +2498,7 @@ export const SlidePreview: React.FC = () => {
                   {/* 操作 */}
                   <div className="flex items-center gap-1.5 md:gap-2 w-full sm:w-auto justify-center">
                     <div
-                      className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-border-primary bg-gray-50 dark:bg-background-tertiary px-2.5 py-1.5"
+                      className="flex items-center gap-2 px-1.5 py-1"
                       title={`${imageQualityControlEnabled ? t('preview.qualityControlOn') : t('preview.qualityControlOff')} · ${t('preview.qualityControlDesc')}`}
                     >
                       <ShieldCheck size={15} className="flex-shrink-0 text-banana-600 dark:text-banana-300" />
