@@ -19,6 +19,7 @@ interface ImportMarkdownModalProps {
   cancelButtonLabel: string;
   emptyError: string;
   readFileError: string;
+  invalidFileTypeError: string;
   getPreviewCount?: (markdown: string) => number;
   previewReadyLabel?: (count: number) => string;
   previewEmptyLabel?: string;
@@ -39,6 +40,7 @@ export const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({
   cancelButtonLabel,
   emptyError,
   readFileError,
+  invalidFileTypeError,
   getPreviewCount,
   previewReadyLabel,
   previewEmptyLabel,
@@ -71,6 +73,14 @@ export const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({
     if (inputRef.current) inputRef.current.value = '';
   }, []);
 
+  const isSupportedMarkdownFile = useCallback((file: File) => {
+    if (!file || typeof file.name !== 'string') return false;
+    const lowerName = file.name.toLowerCase();
+    const hasSupportedExtension = ['.md', '.markdown', '.txt'].some((extension) => lowerName.endsWith(extension));
+    const hasSupportedType = typeof file.type === 'string' && ['text/markdown', 'text/plain'].includes(file.type);
+    return hasSupportedExtension || hasSupportedType;
+  }, []);
+
   const handleClose = useCallback(() => {
     if (isImporting) return;
     resetState();
@@ -78,6 +88,13 @@ export const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({
   }, [isImporting, onClose, resetState]);
 
   const readFile = useCallback(async (file: File) => {
+    if (!isSupportedMarkdownFile(file)) {
+      setSelectedFileName('');
+      setError(invalidFileTypeError);
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
+
     try {
       const text = await file.text();
       setContent(text);
@@ -86,7 +103,7 @@ export const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({
     } catch {
       setError(readFileError);
     }
-  }, [readFileError]);
+  }, [invalidFileTypeError, isSupportedMarkdownFile, readFileError]);
 
   const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -175,7 +192,7 @@ export const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({
             <input
               ref={inputRef}
               type="file"
-              accept=".md,.txt,text/markdown,text/plain"
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
               className="hidden"
               onChange={handleFileSelect}
             />
