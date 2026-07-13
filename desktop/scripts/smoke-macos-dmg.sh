@@ -67,7 +67,23 @@ bundle_icon_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$insta
 [[ "$bundle_icon_name" == "icon.icns" ]] || fail "Unexpected CFBundleIconFile: $bundle_icon_name"
 bundle_icon="$installed_app/Contents/Resources/$bundle_icon_name"
 [[ -f "$bundle_icon" ]] || fail "Bundle icon missing: $bundle_icon"
-cmp -s "$bundle_icon" "$(dirname "$0")/../resources/icon.icns" || fail "Packaged ICNS differs from the verified app icon"
+
+bundle_icon_asset_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$installed_app/Contents/Info.plist" 2>/dev/null || true)"
+[[ "$bundle_icon_asset_name" == "Icon" ]] || fail "Unexpected CFBundleIconName: $bundle_icon_asset_name"
+asset_catalog="$installed_app/Contents/Resources/Assets.car"
+[[ -f "$asset_catalog" ]] || fail "Adaptive Assets.car missing: $asset_catalog"
+[[ "$(stat -f%z "$asset_catalog")" -gt 10000 ]] || fail "Adaptive Assets.car is unexpectedly small"
+assetutil --info "$asset_catalog" > "$out_dir/icon-assets.json"
+node -e '
+  const assets = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const header = assets.find((asset) => asset.Appearances);
+  if (!assets.some((asset) => asset.Name === "Icon" && asset.AssetType === "Icon Image")) {
+    throw new Error("Assets.car does not contain the Icon app icon");
+  }
+  if (!header?.Appearances || !("NSAppearanceNameDarkAqua" in header.Appearances)) {
+    throw new Error("Assets.car does not contain a dark appearance");
+  }
+' "$out_dir/icon-assets.json"
 
 for tray_icon in trayTemplate.png trayTemplate@2x.png; do
   installed_tray_icon="$installed_app/Contents/Resources/$tray_icon"

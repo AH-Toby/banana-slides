@@ -32,7 +32,7 @@ test('macOS Tray uses its dedicated template image', () => {
   );
 });
 
-test('development macOS may set the Dock icon from the shared app master', () => {
+test('development macOS may set the Dock icon from the opaque fallback', () => {
   const context = {
     isPackaged: false,
     resourcesPath: path.join(path.sep, 'unused'),

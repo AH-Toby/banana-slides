@@ -1,14 +1,16 @@
 const path = require('path');
 
 const DESKTOP_ICON_RESOURCES = Object.freeze({
+  brandPng: 'BananaSlides.icon/Assets/brand-logo.png',
   appPng: 'icon.png',
   appIco: 'icon.ico',
+  macComposer: 'BananaSlides.icon',
   macBundle: 'icon.icns',
   macTray: 'trayTemplate.png',
   macTray2x: 'trayTemplate@2x.png',
 });
 
-const SPLASH_ICON_PATH = `resources/${DESKTOP_ICON_RESOURCES.appPng}`;
+const SPLASH_ICON_PATH = `resources/${DESKTOP_ICON_RESOURCES.brandPng}`;
 
 function getResourceRoot({ isPackaged, resourcesPath, desktopDir }) {
   return isPackaged ? resourcesPath : path.join(desktopDir, 'resources');

@@ -36,6 +36,6 @@
     "@ffprobe-installer/ffprobe": "^2.1.2",
     "cross-env": "^7.0.3",
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^26.15.6"
   }
 }

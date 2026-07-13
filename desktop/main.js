@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, dialog, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, dialog, nativeImage, nativeTheme } = require('electron');
 const path = require('path');
 const log = require('electron-log');
 const fs = require('fs');
@@ -138,6 +138,7 @@ function createSplashWindow() {
     frame: false,
     resizable: false,
     transparent: false,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#111111' : '#ffffff',
     center: true,
     skipTaskbar: true,
     webPreferences: { nodeIntegration: false, contextIsolation: true },

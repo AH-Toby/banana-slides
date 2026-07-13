@@ -4,8 +4,8 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const {
-  assertCommandSucceeded,
-  assertPixelBuffersClose,
+  assertIconComposer,
+  assertPng,
   checkIconContract,
   readPngMetadata,
   readTopLevelYamlSection,
@@ -15,8 +15,38 @@ test('desktop icon assets and packaging follow one contract', () => {
   const checks = checkIconContract();
 
   assert.equal(checks.length, 5);
-  assert.ok(checks.includes('ICNS generated from the shared master'));
+  assert.ok(checks.includes('adaptive white and near-black Icon Composer appearances'));
   assert.ok(checks.includes('16px and 32px macOS template Tray icons'));
+});
+
+test('legacy app icon fallback must be opaque to avoid the macOS gray backplate', () => {
+  const transparentPng = path.resolve(__dirname, '../resources/trayTemplate.png');
+
+  assert.throws(
+    () => assertPng(transparentPng, 16, 16, 72, 2),
+    /opaque RGB background/,
+  );
+});
+
+test('Icon Composer contract rejects a drifting dark appearance', () => {
+  const sourcePath = path.resolve(__dirname, '../resources/BananaSlides.icon');
+  const brandPath = path.resolve(__dirname, '../resources/BananaSlides.icon/Assets/brand-logo.png');
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'banana-icon-composer-'));
+  const composerPath = path.join(tempDir, 'BananaSlides.icon');
+  try {
+    fs.cpSync(sourcePath, composerPath, { recursive: true });
+    const manifestPath = path.join(composerPath, 'icon.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    manifest['fill-specializations'][1].value.solid = 'srgb:0.00000,0.00000,0.00000,1.00000';
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+
+    assert.throws(
+      () => assertIconComposer(composerPath, brandPath),
+      /#111111 background/,
+    );
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test('PNG metadata parser reports a truncated chunk without a RangeError', () => {
@@ -38,18 +68,6 @@ test('PNG metadata parser reports a truncated chunk without a RangeError', () =>
   }
 });
 
-test('command failures include spawn errors', () => {
-  assert.throws(
-    () => assertCommandSucceeded({
-      status: null,
-      stdout: '',
-      stderr: '',
-      error: new Error('spawn iconutil ENOENT'),
-    }, 'iconutil'),
-    /spawn iconutil ENOENT/,
-  );
-});
-
 test('PNG metadata parser rejects files shorter than an IHDR chunk', () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'banana-short-png-'));
   const shortPath = path.join(tempDir, 'short.png');
@@ -68,18 +86,4 @@ test('YAML section reader accepts spacing and an inline comment', () => {
     readTopLevelYamlSection(source, 'files'),
     'files  : # packaged files\n  - "main.js"\n',
   );
-});
-
-test('pixel comparison tolerates color-profile rounding but rejects different images', () => {
-  const expected = Buffer.from([10, 20, 30, 255, 40, 50, 60, 255]);
-  assert.doesNotThrow(() => assertPixelBuffersClose(
-    Buffer.from([11, 20, 29, 255, 40, 51, 60, 255]),
-    expected,
-    'close pixels',
-  ));
-  assert.throws(() => assertPixelBuffersClose(
-    Buffer.from([50, 60, 70, 255, 80, 90, 100, 255]),
-    expected,
-    'different pixels',
-  ), /max channel delta/);
 });

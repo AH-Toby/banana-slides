@@ -1,8 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
 const {
   DESKTOP_ICON_RESOURCES,
   SPLASH_ICON_PATH,
@@ -40,14 +38,18 @@ function readPngMetadata(filePath) {
   };
 }
 
-function assertPng(filePath, expectedWidth, expectedHeight, expectedDpi = null) {
+function assertPng(filePath, expectedWidth, expectedHeight, expectedDpi = null, expectedColorType = 6) {
   const metadata = readPngMetadata(filePath);
   assert.deepEqual(
     { width: metadata.width, height: metadata.height },
     { width: expectedWidth, height: expectedHeight },
     `${filePath} must be ${expectedWidth}x${expectedHeight}`,
   );
-  assert.equal(metadata.colorType, 6, `${filePath} must retain an RGBA alpha channel`);
+  const colorTypeDescription = expectedColorType === 2
+    ? 'an opaque RGB background'
+    : 'an RGBA alpha channel';
+  assert.equal(metadata.colorType, expectedColorType,
+    `${filePath} must retain ${colorTypeDescription}`);
   if (expectedDpi !== null) {
     assert.ok(metadata.dpi, `${filePath} must declare its pixel density`);
     assert.ok(Math.abs(metadata.dpi.x - expectedDpi) < 0.1,
@@ -67,81 +69,49 @@ function readTopLevelYamlSection(source, sectionName) {
   return lines.slice(start, end).join('\n');
 }
 
-function assertCommandSucceeded(result, command) {
-  if (result.status === 0) return;
-  const details = [result.stdout, result.stderr, result.error?.message]
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-  throw new Error(`${command} failed${details ? `:\n${details}` : ''}`);
-}
-
-function readBmpPixels(filePath) {
-  const data = fs.readFileSync(filePath);
-  assert.equal(data.subarray(0, 2).toString('ascii'), 'BM', `${filePath} is not a BMP file`);
-  const pixelOffset = data.readUInt32LE(10);
-  assert.ok(pixelOffset >= 14 && pixelOffset < data.length, `${filePath} has an invalid pixel offset`);
-  return data.subarray(pixelOffset);
-}
-
-function assertPixelBuffersClose(actual, expected, message) {
-  assert.equal(actual.length, expected.length, `${message}: pixel buffer lengths differ`);
-  let maxDelta = 0;
-  let totalDelta = 0;
-  for (let index = 0; index < actual.length; index += 1) {
-    const delta = Math.abs(actual[index] - expected[index]);
-    maxDelta = Math.max(maxDelta, delta);
-    totalDelta += delta;
+function isVersionAtLeast(versionRange, minimumVersion) {
+  const parse = (value) => {
+    const match = String(value).match(/\d+\.\d+\.\d+/);
+    return match ? match[0].split('.').map(Number) : null;
+  };
+  const version = parse(versionRange);
+  const minimum = parse(minimumVersion);
+  if (!version || !minimum) return false;
+  for (let index = 0; index < minimum.length; index += 1) {
+    if (version[index] !== minimum[index]) return version[index] > minimum[index];
   }
-  const meanDelta = totalDelta / actual.length;
-  assert.ok(maxDelta <= 16 && meanDelta <= 1,
-    `${message}: max channel delta ${maxDelta}, mean channel delta ${meanDelta.toFixed(4)}`);
+  return true;
 }
 
-function assertMacIcnsMatchesMaster(masterPath, icnsPath) {
-  if (process.platform !== 'darwin') return;
+function assertIconComposer(composerPath, brandPath) {
+  const manifestPath = path.join(composerPath, 'icon.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const fills = manifest['fill-specializations'];
+  assert.ok(Array.isArray(fills), `${manifestPath} must define adaptive background fills`);
 
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'banana-icon-contract-'));
-  const iconsetPath = path.join(tempDir, 'icon.iconset');
-  const masterBmpPath = path.join(tempDir, 'master.bmp');
-  const bundledBmpPath = path.join(tempDir, 'bundled.bmp');
-  try {
-    const convertMaster = spawnSync(
-      'sips',
-      ['-s', 'format', 'bmp', masterPath, '--out', masterBmpPath],
-      { encoding: 'utf8' },
-    );
-    assertCommandSucceeded(convertMaster, 'sips');
+  const defaultFill = fills.find((fill) => !fill.appearance);
+  const darkFill = fills.find((fill) => fill.appearance === 'dark');
+  assert.equal(defaultFill?.value?.solid, 'srgb:1.00000,1.00000,1.00000,1.00000',
+    'Default Icon Composer appearance must use a white background');
+  assert.equal(darkFill?.value?.solid, 'srgb:0.06667,0.06667,0.06667,1.00000',
+    'Dark Icon Composer appearance must use a #111111 background');
 
-    const extract = spawnSync(
-      'iconutil',
-      ['--convert', 'iconset', '--output', iconsetPath, icnsPath],
-      { encoding: 'utf8' },
-    );
-    assertCommandSucceeded(extract, 'iconutil');
+  const layers = (manifest.groups || []).flatMap((group) => group.layers || []);
+  const brandFileName = path.basename(DESKTOP_ICON_RESOURCES.brandPng);
+  const brandLayer = layers.find((layer) => layer['image-name'] === brandFileName);
+  assert.ok(brandLayer, `Icon Composer must use ${brandFileName}`);
+  assert.ok(brandLayer.position?.scale > 0 && brandLayer.position.scale <= 0.8,
+    'Icon Composer foreground must stay inside the macOS safe zone');
 
-    const bundled1024 = path.join(iconsetPath, 'icon_512x512@2x.png');
-    const convertBundled = spawnSync(
-      'sips',
-      ['-s', 'format', 'bmp', bundled1024, '--out', bundledBmpPath],
-      { encoding: 'utf8' },
-    );
-    assertCommandSucceeded(convertBundled, 'sips');
-
-    assertPixelBuffersClose(
-      readBmpPixels(masterBmpPath),
-      readBmpPixels(bundledBmpPath),
-      'icon.icns pixels must match resources/icon.png',
-    );
-  } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  }
+  assert.equal(path.resolve(composerPath, 'Assets', brandFileName), brandPath,
+    'Icon Composer and splash must point to the same brand artwork');
 }
 
 function checkIconContract(rootDir = desktopDir) {
   const resourcesDir = path.join(rootDir, 'resources');
-  const masterPath = path.join(resourcesDir, DESKTOP_ICON_RESOURCES.appPng);
-  const icnsPath = path.join(resourcesDir, DESKTOP_ICON_RESOURCES.macBundle);
+  const fallbackPath = path.join(resourcesDir, DESKTOP_ICON_RESOURCES.appPng);
+  const brandPath = path.join(resourcesDir, DESKTOP_ICON_RESOURCES.brandPng);
+  const composerPath = path.join(resourcesDir, DESKTOP_ICON_RESOURCES.macComposer);
   const trayPath = path.join(resourcesDir, DESKTOP_ICON_RESOURCES.macTray);
   const tray2xPath = path.join(resourcesDir, DESKTOP_ICON_RESOURCES.macTray2x);
   const splashPath = path.join(rootDir, 'splash.html');
@@ -149,28 +119,38 @@ function checkIconContract(rootDir = desktopDir) {
   const mainPath = path.join(rootDir, 'main.js');
   const packagePath = path.join(rootDir, 'package.json');
 
-  assertPng(masterPath, 1024, 1024);
+  assertPng(fallbackPath, 1024, 1024, null, 2);
+  assertPng(brandPath, 1024, 1024);
   assertPng(trayPath, 16, 16, 72);
   assertPng(tray2xPath, 32, 32, 144);
-
-  const icns = fs.readFileSync(icnsPath);
-  assert.equal(icns.subarray(0, 4).toString('ascii'), 'icns', `${icnsPath} is not an ICNS file`);
-  assertMacIcnsMatchesMaster(masterPath, icnsPath);
+  assertIconComposer(composerPath, brandPath);
+  assert.ok(!fs.existsSync(path.join(resourcesDir, DESKTOP_ICON_RESOURCES.macBundle)),
+    'Do not track a stale legacy ICNS; electron-builder generates the fallback from Icon Composer');
 
   const splash = fs.readFileSync(splashPath, 'utf8');
   assert.ok(splash.includes(`src="${SPLASH_ICON_PATH}"`),
     `Splash must use the shared ${SPLASH_ICON_PATH} master`);
-  assert.ok(!splash.includes('logo.png'), 'Splash must not use the legacy standalone logo.png');
   assert.ok(!fs.existsSync(path.join(rootDir, 'logo.png')), 'Remove the legacy desktop/logo.png asset');
+  assert.ok(splash.includes('@media (prefers-color-scheme: dark)'),
+    'Splash must follow the system light/dark appearance');
+  assert.ok(splash.includes('--icon-background: #ffffff'),
+    'Splash light appearance must use a white icon background');
+  assert.ok(splash.includes('--icon-background: #111111'),
+    'Splash dark appearance must use a #111111 icon background');
 
   const builder = fs.readFileSync(builderPath, 'utf8');
   const filesSection = readTopLevelYamlSection(builder, 'files');
   assert.ok(!filesSection.includes('resources/icon.icns'), 'Do not duplicate icon.icns inside app.asar');
   assert.ok(!filesSection.includes('resources/icon.ico'), 'Do not duplicate icon.ico inside app.asar');
-  assert.ok(filesSection.includes('resources/icon.png'), 'Splash icon must be packaged inside app.asar');
+  assert.ok(filesSection.includes(`resources/${DESKTOP_ICON_RESOURCES.brandPng}`),
+    'Splash brand artwork must be packaged inside app.asar');
+  assert.ok(filesSection.includes(`resources/${DESKTOP_ICON_RESOURCES.appPng}`),
+    'Default fallback icon must be packaged inside app.asar');
   const macSection = readTopLevelYamlSection(builder, 'mac');
-  assert.match(macSection, /^\s{2}icon: resources\/icon\.icns$/m,
-    'mac.icon must use resources/icon.icns');
+  assert.match(macSection, /^\s{2}icon: resources\/BananaSlides\.icon$/m,
+    'mac.icon must use the adaptive Icon Composer asset');
+  assert.match(macSection, /^\s{2}darkModeSupport: true$/m,
+    'mac.darkModeSupport must allow the system to select the dark icon appearance');
   for (const resourceName of [DESKTOP_ICON_RESOURCES.macTray, DESKTOP_ICON_RESOURCES.macTray2x]) {
     assert.ok(builder.includes(`from: "resources/${resourceName}"`),
       `electron-builder must package resources/${resourceName}`);
@@ -195,17 +175,21 @@ function checkIconContract(rootDir = desktopDir) {
     'only a large PNG Tray icon should be resized',
   );
   assert.ok(main.includes('if (icon.isEmpty())'), 'Tray icon loading must handle missing or corrupt files');
+  assert.ok(main.includes("backgroundColor: nativeTheme.shouldUseDarkColors ? '#111111' : '#ffffff'"),
+    'Splash BrowserWindow background must match the active icon appearance');
 
   const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  assert.ok(isVersionAtLeast(packageJson.devDependencies['electron-builder'], '26.3.0'),
+    'electron-builder 26.3.0 or newer is required for Icon Composer assets');
   for (const scriptName of ['prebuild:win', 'prebuild:mac', 'prebuild:linux', 'prebuild:all']) {
     assert.ok(packageJson.scripts[scriptName].includes('npm run check:icons'),
       `${scriptName} must enforce the icon contract`);
   }
 
   return [
-    '1024x1024 app icon master',
-    'ICNS generated from the shared master',
-    'shared splash icon',
+    'white legacy app icon fallback',
+    'adaptive white and near-black Icon Composer appearances',
+    'shared adaptive splash artwork',
     '16px and 32px macOS template Tray icons',
     'packaging and runtime icon policy',
   ];
@@ -217,8 +201,8 @@ if (require.main === module) {
 }
 
 module.exports = {
-  assertCommandSucceeded,
-  assertPixelBuffersClose,
+  assertIconComposer,
+  assertPng,
   checkIconContract,
   readPngMetadata,
   readTopLevelYamlSection,
