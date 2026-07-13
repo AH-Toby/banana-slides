@@ -95,6 +95,22 @@ def test_forced_images_protocol_preserves_refs_for_custom_proxy_model():
     assert len(request['image']) == 2
 
 
+def test_invalid_edit_size_falls_back_to_square(caplog):
+    provider = _make_provider()
+
+    provider.generate_image(
+        prompt='Use this reference.',
+        ref_images=[Image.new('RGB', (8, 8), color='green')],
+        aspect_ratio='invalid',
+        resolution='1K',
+    )
+
+    request = provider.client.images.edit.call_args.kwargs
+    assert request['size'] == '1024x1024'
+    assert Image.open(request['image']).size == (1024, 1024)
+    assert "falling back to 1024x1024" in caplog.text
+
+
 def test_gpt_image_rejects_more_than_sixteen_references():
     provider = _make_provider()
     references = [Image.new('RGB', (8, 8), color='white') for _ in range(17)]

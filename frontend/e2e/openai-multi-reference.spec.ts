@@ -1,16 +1,62 @@
 import { test, expect } from '@playwright/test'
+import { execFileSync } from 'child_process'
 import { createServer, type Server } from 'http'
 import * as fs from 'fs'
 import * as path from 'path'
+import { fileURLToPath } from 'url'
 
 const FRONTEND_DIR = process.cwd().endsWith('frontend')
   ? process.cwd()
   : path.join(process.cwd(), 'frontend')
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const SETTINGS_DB = path.join(PROJECT_ROOT, 'backend', 'instance', 'database.db')
 const FIXTURES = path.join(FRONTEND_DIR, 'e2e', 'fixtures')
 const RESPONSE_IMAGE = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
   'base64',
 )
+
+type RawImageSettings = {
+  ai_provider_format: string | null
+  image_model_source: string | null
+  image_model: string | null
+  image_api_key: string | null
+  image_api_base_url: string | null
+  openai_image_api_protocol: string | null
+  image_resolution: string | null
+  updated_at: string | null
+}
+
+function readRawImageSettings(): RawImageSettings {
+  const query = [
+    'SELECT ai_provider_format, image_model_source, image_model,',
+    'image_api_key, image_api_base_url, openai_image_api_protocol,',
+    'image_resolution, updated_at FROM settings WHERE id = 1;',
+  ].join(' ')
+  const output = execFileSync(
+    'sqlite3',
+    ['-cmd', '.timeout 5000', '-json', SETTINGS_DB, query],
+    { encoding: 'utf8' },
+  )
+  const rows = JSON.parse(output) as RawImageSettings[]
+  if (!rows[0]) throw new Error('Settings row was not created by the backend')
+  return rows[0]
+}
+
+function sqlText(value: string | null): string {
+  if (value === null) return 'NULL'
+  return `CAST(X'${Buffer.from(value, 'utf8').toString('hex')}' AS TEXT)`
+}
+
+function restoreRawImageSettings(settings: RawImageSettings): void {
+  const assignments = Object.entries(settings)
+    .map(([column, value]) => `${column} = ${sqlText(value)}`)
+    .join(', ')
+  execFileSync(
+    'sqlite3',
+    ['-cmd', '.timeout 5000', SETTINGS_DB, `UPDATE settings SET ${assignments} WHERE id = 1;`],
+  )
+}
 
 test.describe('OpenAI native multi-reference generation', () => {
   test.skip(
@@ -19,14 +65,45 @@ test.describe('OpenAI native multi-reference generation', () => {
   )
 
   let fakeOpenAI: Server | undefined
+  let projectId: string | undefined
+  let originalRawSettings: RawImageSettings
+  let originalEffectiveSettings: Record<string, unknown>
 
-  test.afterEach(async () => {
+  test.beforeAll(async ({ request }) => {
+    const response = await request.get('/api/settings')
+    expect(response.ok()).toBe(true)
+    originalEffectiveSettings = (await response.json()).data
+    originalRawSettings = readRawImageSettings()
+  })
+
+  test.afterEach(async ({ request }) => {
+    if (projectId) {
+      const response = await request.delete(`/api/projects/${projectId}`)
+      expect(response.ok()).toBe(true)
+      projectId = undefined
+    }
     if (fakeOpenAI) {
       await new Promise<void>((resolve, reject) => {
         fakeOpenAI!.close((error) => error ? reject(error) : resolve())
       })
       fakeOpenAI = undefined
     }
+  })
+
+  test.afterAll(async ({ request }) => {
+    const response = await request.put('/api/settings', {
+      data: {
+        ai_provider_format: originalEffectiveSettings.ai_provider_format,
+        image_model_source: originalRawSettings.image_model_source,
+        image_model: originalRawSettings.image_model,
+        image_api_key: originalRawSettings.image_api_key,
+        image_api_base_url: originalRawSettings.image_api_base_url,
+        openai_image_api_protocol: originalRawSettings.openai_image_api_protocol || 'auto',
+        image_resolution: originalEffectiveSettings.image_resolution,
+      },
+    })
+    expect(response.ok()).toBe(true)
+    restoreRawImageSettings(originalRawSettings)
   })
 
   test('sends the template and every description image to images.edit', async ({ page, request }) => {
@@ -72,9 +149,10 @@ test.describe('OpenAI native multi-reference generation', () => {
       },
     })
     expect(projectResponse.ok()).toBe(true)
-    const projectId = (await projectResponse.json()).data.project_id
+    const createdProjectId = (await projectResponse.json()).data.project_id as string
+    projectId = createdProjectId
 
-    const pageResponse = await request.post(`/api/projects/${projectId}/pages`, {
+    const pageResponse = await request.post(`/api/projects/${createdProjectId}/pages`, {
       data: {
         order_index: 0,
         outline_content: { title: 'Reference Test' },
@@ -86,7 +164,7 @@ test.describe('OpenAI native multi-reference generation', () => {
     const fixtureNames = ['slide_1.jpg', 'slide_2.jpg', 'slide_3.jpg']
     const fixtureBuffers = fixtureNames.map((name) => fs.readFileSync(path.join(FIXTURES, name)))
 
-    const templateResponse = await request.post(`/api/projects/${projectId}/template`, {
+    const templateResponse = await request.post(`/api/projects/${createdProjectId}/template`, {
       multipart: {
         template_image: {
           name: fixtureNames[0],
@@ -99,7 +177,7 @@ test.describe('OpenAI native multi-reference generation', () => {
 
     const materialUrls: string[] = []
     for (let index = 1; index < fixtureBuffers.length; index++) {
-      const uploadResponse = await request.post(`/api/projects/${projectId}/materials/upload`, {
+      const uploadResponse = await request.post(`/api/projects/${createdProjectId}/materials/upload`, {
         multipart: {
           file: {
             name: fixtureNames[index],
@@ -113,7 +191,7 @@ test.describe('OpenAI native multi-reference generation', () => {
     }
 
     const descriptionResponse = await request.put(
-      `/api/projects/${projectId}/pages/${pageId}/description`,
+      `/api/projects/${createdProjectId}/pages/${pageId}/description`,
       {
         data: {
           description_content: {
@@ -131,8 +209,8 @@ test.describe('OpenAI native multi-reference generation', () => {
     await page.addInitScript((id) => {
       localStorage.setItem('hasSeenHelpModal', 'true')
       localStorage.setItem('currentProjectId', id)
-    }, projectId)
-    await page.goto(`/project/${projectId}/preview`)
+    }, createdProjectId)
+    await page.goto(`/project/${createdProjectId}/preview`)
 
     const generateButton = page.getByRole('button', { name: /批量生成图片|Generate Images/i })
     await expect(generateButton).toBeVisible()
