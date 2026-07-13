@@ -60,7 +60,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ children, className = '' }) 
         ),
         img: ({ src, alt }) => (
           <img
-            src={getImageUrl(src)}
+            src={src ? getImageUrl(src) : undefined}
             alt={alt || ''}
             className="max-w-48 max-h-36 w-auto h-auto rounded-lg my-2"
             loading="lazy"

@@ -44,9 +44,9 @@ describe('Markdown desktop images', () => {
   it.each([
     ['data', 'data:image/png;base64,iVBORw0KGgo='],
     ['blob', 'blob:https://example.com/8c391faa'],
-  ])('keeps %s URLs sanitized according to the existing Markdown policy', (_kind, url) => {
+  ])('omits %s URLs sanitized by the existing Markdown policy', (_kind, url) => {
     render(<Markdown>{`![client-side](${url})`}</Markdown>);
 
-    expect(screen.getByAltText('client-side')).toHaveAttribute('src', '');
+    expect(screen.getByAltText('client-side')).not.toHaveAttribute('src');
   });
 });

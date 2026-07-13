@@ -38,6 +38,11 @@ describe('Markdown Component', () => {
     expect(screen.getByAltText('material')).toHaveAttribute('src', '/files/materials/example.png')
   })
 
+  it('omits src for a Markdown image without a URL', () => {
+    render(<Markdown>![missing image]()</Markdown>)
+    expect(screen.getByAltText('missing image')).not.toHaveAttribute('src')
+  })
+
   it('renders inline LaTeX formula with $ delimiters', () => {
     const { container } = render(<Markdown>The formula $E = mc^2$ is famous</Markdown>)
     // KaTeX renders math into spans with class "katex"
