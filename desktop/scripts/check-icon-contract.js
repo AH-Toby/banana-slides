@@ -19,6 +19,8 @@ function readPngMetadata(filePath) {
   for (let offset = 8; offset + 12 <= data.length;) {
     const length = data.readUInt32BE(offset);
     const type = data.subarray(offset + 4, offset + 8).toString('ascii');
+    assert.ok(offset + length + 12 <= data.length,
+      `${filePath} has a truncated ${type || 'unknown'} chunk`);
     if (type === 'pHYs' && length === 9 && data.readUInt8(offset + 16) === 1) {
       dpi = {
         x: data.readUInt32BE(offset + 8) * 0.0254,
@@ -64,7 +66,10 @@ function readTopLevelYamlSection(source, sectionName) {
 
 function assertCommandSucceeded(result, command) {
   if (result.status === 0) return;
-  const details = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+  const details = [result.stdout, result.stderr, result.error?.message]
+    .filter(Boolean)
+    .join('\n')
+    .trim();
   throw new Error(`${command} failed${details ? `:\n${details}` : ''}`);
 }
 
@@ -144,6 +149,11 @@ function checkIconContract(rootDir = desktopDir) {
     /if \(process\.platform === 'darwin'\) \{\s*icon\.setTemplateImage\(true\);/,
     'macOS Tray icon must be marked as a template image',
   );
+  assert.match(
+    main,
+    /} else if \(process\.platform === 'linux'\) \{\s*icon = icon\.resize\(\{ width: 16, height: 16 \}\);/,
+    'only the large Linux PNG Tray icon should be resized',
+  );
 
   const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
   for (const scriptName of ['prebuild:win', 'prebuild:mac', 'prebuild:linux', 'prebuild:all']) {
@@ -165,4 +175,4 @@ if (require.main === module) {
   for (const check of checks) console.log(`PASS ${check}`);
 }
 
-module.exports = { checkIconContract, readPngMetadata };
+module.exports = { assertCommandSucceeded, checkIconContract, readPngMetadata };

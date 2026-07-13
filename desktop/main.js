@@ -213,7 +213,7 @@ function createTray() {
   if (process.platform === 'darwin') {
     icon.setTemplateImage(true);
     runtimeIconState.trayTemplateImage = true;
-  } else {
+  } else if (process.platform === 'linux') {
     icon = icon.resize({ width: 16, height: 16 });
   }
   tray = new Tray(icon);
