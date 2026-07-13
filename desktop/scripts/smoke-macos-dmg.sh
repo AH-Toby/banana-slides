@@ -30,6 +30,16 @@ cleanup() {
   if [[ -n "${app_pid:-}" ]] && kill -0 "$app_pid" >/dev/null 2>&1; then
     pkill -TERM -P "$app_pid" >/dev/null 2>&1 || true
     kill "$app_pid" >/dev/null 2>&1 || true
+    for _ in 1 2 3; do
+      if ! kill -0 "$app_pid" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+    if kill -0 "$app_pid" >/dev/null 2>&1; then
+      pkill -KILL -P "$app_pid" >/dev/null 2>&1 || true
+      kill -KILL "$app_pid" >/dev/null 2>&1 || true
+    fi
     wait "$app_pid" >/dev/null 2>&1 || true
   fi
   if hdiutil info | grep -q "$mount_dir"; then
