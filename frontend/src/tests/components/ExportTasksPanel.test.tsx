@@ -4,22 +4,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportTasksPanel } from '@/components/shared/ExportTasksPanel';
 import { useExportTasksStore } from '@/store/useExportTasksStore';
 
-const listExports = vi.fn();
-const triggerDownload = vi.fn();
+const mockListExports = vi.fn();
+const mockTriggerDownload = vi.fn();
 
 vi.mock('@/api/endpoints', () => ({
-  listExports: (...args: unknown[]) => listExports(...args),
+  listExports: (...args: unknown[]) => mockListExports(...args),
   deleteExport: vi.fn(),
 }));
 
 vi.mock('@/api/client', () => ({
-  triggerDownload: (...args: unknown[]) => triggerDownload(...args),
+  triggerDownload: (...args: unknown[]) => mockTriggerDownload(...args),
 }));
 
 describe('ExportTasksPanel desktop download routing', () => {
   beforeEach(() => {
-    listExports.mockReset();
-    triggerDownload.mockReset();
+    mockListExports.mockReset();
+    mockTriggerDownload.mockReset();
     useExportTasksStore.setState({ tasks: [] });
   });
 
@@ -36,7 +36,7 @@ describe('ExportTasksPanel desktop download routing', () => {
         createdAt: new Date().toISOString(),
       }],
     });
-    listExports.mockResolvedValue({
+    mockListExports.mockResolvedValue({
       data: {
         files: [{
           filename: 'saved-result.pptx',
@@ -59,12 +59,12 @@ describe('ExportTasksPanel desktop download routing', () => {
     await userEvent.click(downloadButtons[1]);
 
     await waitFor(() => {
-      expect(triggerDownload).toHaveBeenNthCalledWith(
+      expect(mockTriggerDownload).toHaveBeenNthCalledWith(
         1,
         '/files/project-1/exports/task-result.pptx',
         'task-result.pptx',
       );
-      expect(triggerDownload).toHaveBeenNthCalledWith(
+      expect(mockTriggerDownload).toHaveBeenNthCalledWith(
         2,
         '/files/project-1/exports/saved-result.pptx',
         'saved-result.pptx',
