@@ -127,6 +127,7 @@ function downloadToPath({
         return;
       }
 
+      downloadSession.removeListener('will-download', listener);
       activeItem = item;
       item.setSavePath(savePath);
       item.once('done', async (_event, state) => {

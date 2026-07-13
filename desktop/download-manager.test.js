@@ -50,6 +50,7 @@ class FakeDownloadSession extends EventEmitter {
     this.payload = payload;
     this.terminalState = terminalState;
     this.requestedUrl = null;
+    this.listenerCountAfterMatch = null;
   }
 
   downloadURL(url) {
@@ -57,6 +58,7 @@ class FakeDownloadSession extends EventEmitter {
     const item = new FakeDownloadItem(url, this.payload, this.terminalState);
     queueMicrotask(() => {
       this.emit('will-download', {}, item);
+      this.listenerCountAfterMatch = this.listenerCount('will-download');
       queueMicrotask(() => item.complete());
     });
   }
@@ -78,6 +80,7 @@ test('waits for Session.downloadURL to write a non-empty file', async (t) => {
   assert.equal(result.filePath, savePath);
   assert.equal(fs.readFileSync(savePath, 'utf8'), 'pptx bytes');
   assert.equal(downloadSession.requestedUrl, 'http://127.0.0.1:15000/files/project/exports/presentation.pptx');
+  assert.equal(downloadSession.listenerCountAfterMatch, 0);
 });
 
 test('reports an interrupted download instead of claiming success', async (t) => {
