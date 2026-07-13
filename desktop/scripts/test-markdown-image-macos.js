@@ -151,7 +151,7 @@ async function main() {
     });
     assert.equal(pageRecord.response.status, 201);
 
-    const { chromium } = frontendRequire('playwright');
+    const { chromium } = frontendRequire('@playwright/test');
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`);
     const context = browser.contexts()[0];
     assert.ok(context, 'Electron browser context was not available');
