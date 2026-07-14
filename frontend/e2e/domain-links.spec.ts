@@ -39,8 +39,8 @@ test.describe('Banana Slides official domains', () => {
     for (const relativePath of firstPartyFiles) {
       const content = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
       expect(content, relativePath).toContain('bananaslides.online');
-      expect(content, relativePath).not.toContain('https://docs.inferera.com');
-      expect(content, relativePath).not.toContain('https://inferera.com');
+      const contentWithoutProviderLinks = content.replace(/api\.inferera\.com/g, '');
+      expect(contentWithoutProviderLinks, relativePath).not.toContain('inferera.com');
     }
 
     const providerExamples = [
