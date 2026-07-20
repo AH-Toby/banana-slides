@@ -508,3 +508,30 @@ def test_trim_page_for_match_structured_schema_unchanged():
     assert row['title'] == 'T'
     assert row['summary'] == 'a / b'
     assert 'layout_hint' not in row
+
+
+def test_trim_template_for_match_includes_identity_fields():
+    """Matcher must see the template's visible text and upload order,
+    otherwise per-page draft libraries cannot be matched one-to-one."""
+    import json
+    from services.ai_service import AIService
+
+    class FakeAsset:
+        id = 'a1'
+        sort_order = 4
+        user_label = None
+        analysis_notes = None
+
+        def get_analysis(self):
+            return {
+                'extracted_text': '进修基地介绍 · 武汉大学中南医院',
+                'template_role': 'content',
+                'layout_structure': 'title-top-two-column',
+                'content_capacity': 'medium',
+                'visual_density': 'medium',
+                'style_keywords': ['medical'],
+            }
+
+    row = AIService._trim_template_for_match(FakeAsset())
+    assert row['sort_order'] == 4
+    assert row['extracted_text'] == '进修基地介绍 · 武汉大学中南医院'

@@ -1408,7 +1408,9 @@ class AIService:
         notes = (asset.analysis_notes or analysis.get('notes') or '')[:200]
         return {
             'asset_id': asset.id,
+            'sort_order': asset.sort_order,
             'user_label': asset.user_label or '',
+            'extracted_text': (analysis.get('extracted_text') or '')[:100],
             'template_role': analysis.get('template_role'),
             'layout_structure': analysis.get('layout_structure'),
             'content_capacity': analysis.get('content_capacity'),

@@ -1286,12 +1286,13 @@ def get_template_analysis_prompt(language: str = 'zh') -> str:
 {"error": "not_a_slide"}
 ```
 
-# JSON Schema (9 字段)
+# JSON Schema (10 字段)
 
 ```json
 {
   "template_role": "cover | content | section_divider | summary | data | comparison | timeline | other",
   "layout_structure": "用 kebab-case 概括版式，如 title-top-two-column / hero-image-bottom-text",
+  "extracted_text": "模板图上可见的真实文字：主标题 + 关键要点，≤80 字；若全是 Lorem ipsum 等占位文字则留空字符串",
   "content_capacity": "low | medium | high",
   "text_regions": [
     {"name": "title", "position": "top | center | bottom | left | right", "size": "small | medium | large"}
@@ -1312,6 +1313,7 @@ def get_template_analysis_prompt(language: str = 'zh') -> str:
 {
   "template_role": "cover",
   "layout_structure": "centered-title-large-hero-bg",
+  "extracted_text": "智慧城市数据平台发布会 · 2025 产品战略",
   "content_capacity": "low",
   "text_regions": [
     {"name": "title", "position": "center", "size": "large"},
@@ -1333,6 +1335,7 @@ def get_template_analysis_prompt(language: str = 'zh') -> str:
 {
   "template_role": "content",
   "layout_structure": "title-top-two-column",
+  "extracted_text": "研究方法与数据来源：问卷调查 / 深度访谈",
   "content_capacity": "medium",
   "text_regions": [
     {"name": "title", "position": "top", "size": "medium"},
@@ -1353,6 +1356,7 @@ def get_template_analysis_prompt(language: str = 'zh') -> str:
 {
   "template_role": "timeline",
   "layout_structure": "horizontal-timeline-five-nodes",
+  "extracted_text": "项目实施路线图：启动 / 调研 / 开发 / 试点 / 推广",
   "content_capacity": "high",
   "text_regions": [
     {"name": "title", "position": "top", "size": "medium"},
@@ -1386,12 +1390,13 @@ If the image is clearly not a slide (e.g. a photo, meme, selfie), return:
 {"error": "not_a_slide"}
 ```
 
-# JSON Schema (9 fields)
+# JSON Schema (10 fields)
 
 ```json
 {
   "template_role": "cover | content | section_divider | summary | data | comparison | timeline | other",
   "layout_structure": "kebab-case layout label, e.g. title-top-two-column / hero-image-bottom-text",
+  "extracted_text": "real text visible on the template: main title + key bullets, <= 80 chars; empty string if it is all placeholder text (Lorem ipsum etc.)",
   "content_capacity": "low | medium | high",
   "text_regions": [
     {"name": "title", "position": "top | center | bottom | left | right", "size": "small | medium | large"}
@@ -1412,6 +1417,7 @@ If the image is clearly not a slide (e.g. a photo, meme, selfie), return:
 {
   "template_role": "cover",
   "layout_structure": "centered-title-large-hero-bg",
+  "extracted_text": "Smart City Data Platform — 2025 Product Strategy",
   "content_capacity": "low",
   "text_regions": [
     {"name": "title", "position": "center", "size": "large"},
@@ -1433,6 +1439,7 @@ If the image is clearly not a slide (e.g. a photo, meme, selfie), return:
 {
   "template_role": "content",
   "layout_structure": "title-top-two-column",
+  "extracted_text": "Research Methods & Data Sources: surveys / interviews",
   "content_capacity": "medium",
   "text_regions": [
     {"name": "title", "position": "top", "size": "medium"},
@@ -1453,6 +1460,7 @@ If the image is clearly not a slide (e.g. a photo, meme, selfie), return:
 {
   "template_role": "timeline",
   "layout_structure": "horizontal-timeline-five-nodes",
+  "extracted_text": "Implementation Roadmap: kickoff / research / build / pilot / rollout",
   "content_capacity": "high",
   "text_regions": [
     {"name": "title", "position": "top", "size": "medium"},
@@ -1524,7 +1532,8 @@ def get_template_auto_match_prompt(templates: list, pages: list, language: str =
 2. **节奏感**：避免连续 5 页用同一张模板；同一模板间至少留 1 页间隔（除非候选数量不足）。
 3. **角色对齐**：封面页应分到 `template_role=cover` 的模板；分章节、总结也按角色优先。
 4. **不确定时**：宁可返回 `status=undecided`（`template_asset_id=null`），让用户手动决定，也不要乱猜。`confidence < 0.5` 时建议改用 undecided。
-5. **绝不**返回不在候选列表里的 `asset_id`。
+5. **文字对应压倒一切**：如果模板的 `extracted_text` 与某页的 `title`/`summary` 明显讲的是同一内容（模板往往就是该页的草稿或成稿），必须把该模板分给该页（confidence ≥ 0.9），此时忽略第 1、2 条。`sort_order` 与 `order_index` 一致可作为佐证。若整个模板库都与页面逐一文字对应，就按此做一对一匹配，不得打乱。
+6. **绝不**返回不在候选列表里的 `asset_id`。
 
 # 输出长度
 
@@ -1566,7 +1575,8 @@ Return exactly **one** JSON array inside a ```json fenced code block. One elemen
 2. **Rhythm**: avoid 5 consecutive pages with the same template; keep at least 1 page gap when candidates allow.
 3. **Role alignment**: covers should pick `template_role=cover`; section dividers and summaries follow their roles.
 4. **When unsure**: prefer `status=undecided` (template_asset_id=null) over guessing. confidence<0.5 should be undecided.
-5. **Never** return an asset_id outside the candidate list.
+5. **Text identity beats everything**: if a template's `extracted_text` clearly describes the same content as a page's `title`/`summary` (templates are often per-page drafts of the deck), assign that template to that page (confidence >= 0.9), overriding principles 1-2. Matching `sort_order` vs `order_index` is supporting evidence. If the whole library maps one-to-one onto the pages, keep that one-to-one mapping — do not shuffle.
+6. **Never** return an asset_id outside the candidate list.
 
 # Length
 
