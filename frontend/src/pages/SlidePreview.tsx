@@ -91,7 +91,7 @@ const previewI18n = {
       regenerate: "重新生成", regenerating: "生成中...",
       editMode: "编辑模式", viewMode: "查看模式", page: "第 {{num}} 页",
       projectSettings: "项目设置", changeTemplate: "更换模板", refresh: "刷新",
-      switchToMulti: "转为多模板", switchToSingle: "转为单模板", templateSetup: "模板配置",
+      switchToMulti: "转为多模板", switchToSingle: "转为单模板", templateSetup: "模板配置", templateMenu: "模板",
       batchGenerate: "批量生成图片 ({{count}})", generateSelected: "生成选中页面 ({{count}})",
       multiSelect: "多选", cancelMultiSelect: "取消多选", pagesUnit: "页",
       noPages: "还没有页面", noPagesHint: "请先返回编辑页面添加内容", backToEdit: "返回编辑",
@@ -225,7 +225,7 @@ const previewI18n = {
       exportSelectedPages: "Will export {{count}} selected page(s)",
       regenerate: "Regenerate", regenerating: "Generating...",
       editMode: "Edit Mode", viewMode: "View Mode", page: "Page {{num}}",
-      switchToMulti: "Switch to multi", switchToSingle: "Switch to single", templateSetup: "Template setup",
+      switchToMulti: "Switch to multi", switchToSingle: "Switch to single", templateSetup: "Template setup", templateMenu: "Template",
       projectSettings: "Project Settings", changeTemplate: "Change Template", refresh: "Refresh",
       batchGenerate: "Batch Generate Images ({{count}})", generateSelected: "Generate Selected ({{count}})",
       multiSelect: "Multi-select", cancelMultiSelect: "Cancel Multi-select", pagesUnit: " pages",
@@ -299,11 +299,12 @@ import {
   FileText,
   Loader2,
   Info,
-  Layers,
-  RectangleHorizontal,
   LayoutTemplate,
+  Presentation,
+  AlertTriangle,
 } from 'lucide-react';
-import { Button, IconButton, Loading, Modal, Textarea, useToast, useConfirm, MaterialSelector, ProjectSettingsModal, ExportTasksPanel, TextStyleSelector } from '@/components/shared';
+import logoUrl from '@/assets/logo.png';
+import { Button, Loading, Modal, Textarea, useToast, useConfirm, MaterialSelector, ProjectSettingsModal, ExportTasksPanel, TextStyleSelector } from '@/components/shared';
 import { SwitchToSingleModeDialog } from '@/components/template/SwitchToSingleModeDialog';
 import { MaterialGeneratorModal } from '@/components/shared/MaterialGeneratorModal';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
@@ -473,6 +474,7 @@ export const SlidePreview: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [imageVersions, setImageVersions] = useState<ImageVersion[]>([]);
   const [showVersionMenu, setShowVersionMenu] = useState(false);
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedPresetTemplateId, setSelectedPresetTemplateId] = useState<string | null>(null);
   const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
@@ -1783,7 +1785,7 @@ export const SlidePreview: React.FC = () => {
               <span className="hidden sm:inline">{t('common.back')}</span>
             </Button>
             <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
-              <span className="text-xl md:text-2xl">🍌</span>
+              <img src={logoUrl} alt="" className="w-6 h-6 md:w-8 md:h-8 object-contain flex-shrink-0" />
               <span className="text-base md:text-xl font-bold truncate">{t('home.title')}</span>
             </div>
             <span className="text-gray-400 hidden md:inline">|</span>
@@ -1799,41 +1801,71 @@ export const SlidePreview: React.FC = () => {
             >
               <span className="hidden xl:inline">{t('preview.projectSettings')}</span>
             </Button>
-            {currentProject?.template_mode === 'multi' ? (
-              <>
-                <IconButton
-                  icon={<LayoutTemplate size={18} />}
-                  label={t('preview.templateSetup')}
-                  tooltipSide="bottom"
-                  onClick={() => navigate(`/project/${projectId}/template-setup`)}
-                  className="hidden lg:inline-flex"
+            {/* 模板菜单：按模式展示 配置/更换 + 模式切换，避免并列入口误用 */}
+            <div className="relative hidden lg:block">
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid="template-menu"
+                title={t('preview.templateMenu')}
+                icon={<LayoutTemplate size={16} className="md:w-[18px] md:h-[18px]" />}
+                onClick={() => setShowTemplateMenu(!showTemplateMenu)}
+              >
+                <span className="hidden xl:inline">{t('preview.templateMenu')}</span>
+                <ChevronDown
+                  size={14}
+                  className={`ml-0.5 transition-transform ${showTemplateMenu ? 'rotate-180' : ''}`}
                 />
-                <IconButton
-                  icon={<RectangleHorizontal size={18} />}
-                  label={t('preview.switchToSingle')}
-                  tooltipSide="bottom"
-                  onClick={() => setIsSwitchSingleOpen(true)}
-                  className="hidden lg:inline-flex"
-                />
-              </>
-            ) : (
-              <IconButton
-                icon={<Layers size={18} />}
-                label={t('preview.switchToMulti')}
-                tooltipSide="bottom"
-                onClick={handleSwitchToMulti}
-                className="hidden lg:inline-flex"
-              />
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<Upload size={16} className="md:w-[18px] md:h-[18px]" />}
-              onClick={() => { setDraftTemplateStyle(templateStyle); setIsTemplateModalOpen(true); }}
-              className="hidden lg:inline-flex"
-            >
-              <span className="hidden xl:inline">{t('preview.changeTemplate')}</span>
-            </Button>
+              </Button>
+              {showTemplateMenu && (
+                <div className="absolute right-0 mt-2 w-44 bg-white dark:bg-background-secondary rounded-lg shadow-lg border border-gray-200 dark:border-border-primary py-2 z-20">
+                  {currentProject?.template_mode === 'multi' ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setShowTemplateMenu(false);
+                          navigate(`/project/${projectId}/template-setup`);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-background-hover transition-colors text-sm"
+                      >
+                        {t('preview.templateSetup')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowTemplateMenu(false);
+                          setIsSwitchSingleOpen(true);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-background-hover transition-colors text-sm"
+                      >
+                        {t('preview.switchToSingle')}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setShowTemplateMenu(false);
+                          setDraftTemplateStyle(templateStyle);
+                          setIsTemplateModalOpen(true);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-background-hover transition-colors text-sm"
+                      >
+                        {t('preview.changeTemplate')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowTemplateMenu(false);
+                          handleSwitchToMulti();
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-background-hover transition-colors text-sm"
+                      >
+                        {t('preview.switchToMulti')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             <Button
               variant="ghost"
               size="sm"
@@ -2562,7 +2594,7 @@ export const SlidePreview: React.FC = () => {
           {currentProject.pages.length === 0 ? (
             <div className="flex-1 flex items-center justify-center overflow-y-auto">
               <div className="text-center">
-                <div className="text-4xl md:text-6xl mb-4">📊</div>
+                <Presentation size={56} className="mx-auto mb-4 text-gray-300 dark:text-foreground-tertiary" strokeWidth={1.5} />
                 <h3 className="text-lg md:text-xl font-semibold text-gray-700 dark:text-foreground-secondary mb-2">
                   {t('preview.noPages')}
                 </h3>
@@ -2594,7 +2626,7 @@ export const SlidePreview: React.FC = () => {
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-background-secondary">
                         <div className="text-center">
-                          <div className="text-6xl mb-4">🍌</div>
+                          <ImageIcon size={48} className="mx-auto mb-4 text-gray-300 dark:text-foreground-tertiary" strokeWidth={1.5} />
                           <p className="text-gray-500 dark:text-foreground-tertiary mb-4">
                             {selectedPage?.status === 'QUEUED'
                               ? t('preview.queued')
@@ -2689,15 +2721,26 @@ export const SlidePreview: React.FC = () => {
                         {t('preview.qualityControlTooltip')}
                       </span>
                     </div>
-                    {/* 手机端：模板更换按钮 */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<Upload size={16} />}
-                      onClick={() => { setDraftTemplateStyle(templateStyle); setIsTemplateModalOpen(true); }}
-                      className="lg:hidden text-xs"
-                      title={t('preview.changeTemplate')}
-                    />
+                    {/* 手机端：multi 模式进入模板配置，single 模式打开更换模板 */}
+                    {currentProject?.template_mode === 'multi' ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<LayoutTemplate size={16} />}
+                        onClick={() => navigate(`/project/${projectId}/template-setup`)}
+                        className="lg:hidden text-xs"
+                        title={t('preview.templateSetup')}
+                      />
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<Upload size={16} />}
+                        onClick={() => { setDraftTemplateStyle(templateStyle); setIsTemplateModalOpen(true); }}
+                        className="lg:hidden text-xs"
+                        title={t('preview.changeTemplate')}
+                      />
+                    )}
                     {/* 手机端：素材生成按钮 */}
                     <Button
                       variant="ghost"
@@ -2983,7 +3026,7 @@ export const SlidePreview: React.FC = () => {
                         {selectedContextImages.descImageUrls.includes(url) && (
                           <div className="absolute inset-0 bg-banana-500/20 border-2 border-banana-500 rounded flex items-center justify-center">
                             <div className="w-6 h-6 bg-banana-500 rounded-full flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">✓</span>
+                              <Check size={12} className="text-white" strokeWidth={3} />
                             </div>
                           </div>
                         )}
@@ -3232,7 +3275,7 @@ export const SlidePreview: React.FC = () => {
       >
         <div className="space-y-4">
           <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="text-2xl">⚠️</div>
+            <AlertTriangle size={22} className="text-amber-500 flex-shrink-0" />
             <div className="flex-1">
               <p className="text-sm text-amber-800">
                 {t('preview.resolution1KWarningText')}

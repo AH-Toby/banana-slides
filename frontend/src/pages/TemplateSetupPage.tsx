@@ -15,6 +15,7 @@ import {
   PenLine,
   Wand2,
 } from 'lucide-react';
+import logoUrl from '@/assets/logo.png';
 import { useT } from '@/hooks/useT';
 import { cn } from '@/utils';
 import { getImageUrl } from '@/api/client';
@@ -396,7 +397,7 @@ export const TemplateSetupPage: React.FC = () => {
               <span className="hidden sm:inline">{t('ts.back')}</span>
             </Button>
             <div className="flex items-center gap-1.5 md:gap-2">
-              <span className="text-xl md:text-2xl">🍌</span>
+              <img src={logoUrl} alt="" className="w-6 h-6 md:w-8 md:h-8 object-contain flex-shrink-0" />
               <span className="text-base md:text-xl font-bold">{t('home.title')}</span>
             </div>
             <span className="text-gray-400 hidden lg:inline">|</span>
